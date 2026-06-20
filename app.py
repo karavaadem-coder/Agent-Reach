@@ -3,6 +3,7 @@ import subprocess
 import os
 import requests
 import re
+import json
 
 app = Flask(__name__)
 
@@ -97,29 +98,45 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
 def twitter_search(query, limit):
-    """Twitter araması yapar ve sonucu formatlar"""
+    """Twitter araması yapar ve sonucu DETAYLI formatlar"""
     try:
         limit = int(limit)
-        
-        # Cookie'leri doğrudan ortama yaz
         os.environ['TWITTER_AUTH_TOKEN'] = TWITTER_AUTH_TOKEN
         os.environ['TWITTER_CT0'] = TWITTER_CT0
         
-        cmd = ['twitter', 'search', query, '-n', str(limit)]
+        cmd = ['twitter', 'search', query, '-n', str(limit), '--format', 'json']
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
         if result.stdout:
-            tweets = [t for t in result.stdout.strip().split('\n') if t.strip()]
-            if not tweets:
-                return f"❌ '{query}' için sonuç bulunamadı."
-            
-            formatted = f"🔍 **'{query}' için {len(tweets[:limit])} tweet:**\n\n"
-            for i, tweet in enumerate(tweets[:limit], 1):
-                tweet_text = tweet[:200] + "..." if len(tweet) > 200 else tweet
-                formatted += f"{i}. {tweet_text}\n"
-            return formatted
+            try:
+                tweets = json.loads(result.stdout)
+                if not tweets:
+                    return f"❌ '{query}' için sonuç bulunamadı."
+                
+                formatted = f"🔍 **'{query}' için {len(tweets[:limit])} tweet:**\n\n"
+                for i, tweet in enumerate(tweets[:limit], 1):
+                    # Kullanıcı bilgileri
+                    username = tweet.get('user', {}).get('screen_name', 'bilinmiyor')
+                    name = tweet.get('user', {}).get('name', 'bilinmiyor')
+                    text = tweet.get('text', '')[:300]
+                    created_at = tweet.get('created_at', 'tarih yok')
+                    
+                    # Tweet linki
+                    tweet_id = tweet.get('id_str', '')
+                    tweet_url = f"https://twitter.com/{username}/status/{tweet_id}" if username and tweet_id else ""
+                    
+                    formatted += f"{i}. **@{username}** ({name})\n"
+                    formatted += f"   📝 {text}\n"
+                    formatted += f"   📍 {created_at}\n"
+                    if tweet_url:
+                        formatted += f"   🔗 {tweet_url}\n"
+                    formatted += "\n"
+                return formatted
+            except json.JSONDecodeError:
+                # JSON değilse düz metin olarak göster
+                return f"🔍 **'{query}' için sonuç:**\n\n{result.stdout[:1500]}"
         else:
-            return f"❌ '{query}' için sonuç bulunamadı."
+            return f"❌ '{query}' için sonuç bulunamadı.\nHata: {result.stderr[:200]}"
     except subprocess.TimeoutExpired:
         return "❌ Zaman aşımı: Twitter çok yavaş yanıt verdi."
     except Exception as e:
