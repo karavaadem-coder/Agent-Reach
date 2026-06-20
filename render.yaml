@@ -1,5 +1,23 @@
-buildCommand: |
-  pip install flask requests python-dotenv gunicorn
-  pip install git+https://github.com/Panniantong/agent-reach.git
-  pip install twitter-cli
-  agent-reach install --env=server --safe
+services:
+  - type: web
+    name: agent-reach-api
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install flask requests python-dotenv gunicorn
+      pip install git+https://github.com/Panniantong/agent-reach.git
+      pip install twitter-cli
+      agent-reach install --env=server --safe
+    startCommand: python app.py
+    healthCheckPath: /
+    envVars:
+      - key: RENDER
+        value: "true"
+      - key: TWITTER_AUTH_TOKEN
+        sync: false
+      - key: TWITTER_CT0
+        sync: false
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: PORT
+        value: "10000"
