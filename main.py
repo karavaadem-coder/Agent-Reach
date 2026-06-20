@@ -2,7 +2,6 @@ from fastapi import FastAPI, Query
 import subprocess
 import os
 import uvicorn
-import shutil
 
 app = FastAPI()
 
@@ -13,24 +12,9 @@ def home():
 @app.get("/ara/twitter")
 def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int = 5):
     try:
-        # Docker (nikolaik/python-nodejs) ortamında global npm ve pipx araçları
-        # genellikle bu iki yoldan birine yüklenir. İkisini de kontrol edip tam yolu buluyoruz.
-        possible_paths = [
-            "/usr/local/bin/twitter",
-            "/root/.local/bin/twitter",
-            "twitter" # Eğer şansımıza PATH'e eklendiyse
-        ]
+        # Doğrudan temiz komutu tetikliyoruz
+        command = f"twitter search \"{q}\" --limit {limit}"
         
-        twitter_bin = "twitter"
-        for path in possible_paths:
-            if os.path.exists(path) or shutil.which(path):
-                twitter_bin = path
-                break
-
-        # Komutu doğrudan asıl aracı hedef alarak oluşturuyoruz
-        command = f"{twitter_bin} search \"{q}\" --limit {limit}"
-        
-        # Komutu arka planda çalıştırıp çıktıları yakalıyoruz
         process = subprocess.run(
             command, 
             shell=True, 
@@ -39,11 +23,9 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
             text=True
         )
         
-        # Eğer komut yine de bulunamaz veya hata verirse detayı görelim
         if process.returncode != 0:
             return {
-                "hata": "Arka plandaki Twitter CLI aracı yürütülürken hata döndü.",
-                "denenen_komut": command,
+                "hata": "Arka plandaki Twitter CLI aracı bir hata döndürdü.",
                 "detay": process.stderr.strip() if process.stderr else process.stdout.strip()
             }
             
