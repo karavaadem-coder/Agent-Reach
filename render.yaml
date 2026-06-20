@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: agent-reach-api
+    runtime: python
+    plan: free  # veya starter
+    buildCommand: |
+      pip install -r requirements.txt
+      pip install agent-reach
+      agent-reach install --env=server --safe
+    startCommand: python app.py  # Ana dosyanın adını kontrol et!
+    healthCheckPath: /health
+    envVars:
+      - key: RENDER
+        value: "true"
+      - key: TWITTER_COOKIES
+        sync: false  # Bu değeri Render dashboard'undan manuel olarak ekleyeceksin
+      # İhtiyacın olan diğer ortam değişkenlerini buraya ekle
