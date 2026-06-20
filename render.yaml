@@ -1,5 +1,5 @@
 buildCommand: |
-  pip install -r requirements.txt
-  pip install agent-reach
+  pip install flask requests python-dotenv gunicorn
+  pip install git+https://github.com/Panniantong/agent-reach.git
   pip install twitter-cli
   agent-reach install --env=server --safe
