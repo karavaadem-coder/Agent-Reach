@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Query
 import subprocess
-import json
 import os
 import uvicorn
 
@@ -13,11 +12,10 @@ def home():
 @app.get("/ara/twitter")
 def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int = 5):
     try:
-        # Agent Reach'in yeni yapısında komutlar doğrudan terminalden çağrılıyor.
-        # twitter-cli aracını q parametresiyle tetikliyoruz.
+        # Agent Reach CLI komutunu arka planda tetikliyoruz
         command = f"twitter search \"{q}\" --limit {limit}"
         
-        # Komutu arka planda çalıştırıp çıktıyı yakalıyoruz
+        # Komutu çalıştırıp çıktıları yakalıyoruz
         process = subprocess.run(
             command, 
             shell=True, 
@@ -26,13 +24,14 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
             text=True
         )
         
+        # Eğer komut bulunamazsa veya sistem hatası verirse
         if process.returncode != 0:
             return {
-                "hata": "Komut çalıştırılırken bir sorun oluştu.",
+                "hata": "Komut çalıştırılırken bir sorun oluştu veya bağımlılıklar eksik.",
                 "detay": process.stderr.strip()
             }
             
-        # Çıktıyı ekrana basıyoruz
+        # Başarılı çıktıyı ham metin olarak döndürüyoruz
         return {
             "sorgu": q,
             "ham_cikti": process.stdout.strip()
@@ -42,6 +41,7 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
         return {"hata": str(e)}
 
 if __name__ == "__main__":
+    # Render'ın dinamik port atamasını yakalar, parantezi eksiksiz kapatır
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=p
                 ort)
