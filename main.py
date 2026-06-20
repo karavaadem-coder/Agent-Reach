@@ -43,5 +43,4 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
 if __name__ == "__main__":
     # Render'ın dinamik port atamasını yakalar, parantezi eksiksiz kapatır
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=p
-                ort)
+    uvicorn.run(app, host="0.0.0.0", port=port)
