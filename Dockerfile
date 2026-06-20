@@ -12,11 +12,8 @@ COPY . .
 
 RUN pip install .
 
-# exit 141 hatasını engellemek için pipefail'i geçici olarak esnetiyoruz 
-# veya doğrudan sorunsuz çalışan bir alt kabuk döngüsü kullanıyoruz.
 RUN bash -c "yes | agent-reach install --env=auto --safe || true"
 
 EXPOSE 10000
 
-CMD ["python", "m
-ain.py"]
+CMD ["python", "main.py"]
