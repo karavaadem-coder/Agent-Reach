@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query
 import subprocess
 import os
 import uvicorn
+import sys
 
 app = FastAPI()
 
@@ -12,10 +13,14 @@ def home():
 @app.get("/ara/twitter")
 def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int = 5):
     try:
-        # Agent Reach CLI komutunu arka planda tetikliyoruz
-        command = f"twitter search \"{q}\" --limit {limit}"
+        # Mevcut python çalıştırıcısının yolunu alıyoruz (Docker içindeki tam yol)
+        python_executable = sys.executable
         
-        # Komutu çalıştırıp çıktıları yakalıyoruz
+        # Sistemi 'twitter' komutu aramak zorunda bırakmıyoruz.
+        # Doğrudan agent_reach modülünü python aracılığıyla tetikliyoruz.
+        command = f"{python_executable} -m agent_reach twitter search \"{q}\" --limit {limit}"
+        
+        # Komutu arka planda çalıştırıp çıktıları yakalıyoruz
         process = subprocess.run(
             command, 
             shell=True, 
@@ -24,14 +29,15 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
             text=True
         )
         
-        # Eğer komut bulunamazsa veya sistem hatası verirse
+        # Eğer yine de modül bulunamazsa hatayı detaylıca görelim
         if process.returncode != 0:
             return {
-                "hata": "Komut çalıştırılırken bir sorun oluştu veya bağımlılıklar eksik.",
-                "detay": process.stderr.strip()
+                "hata": "Agent Reach modülü tetiklenirken bir sorun oluştu.",
+                "komut_denenen": command,
+                "detay": process.stderr.strip() if process.stderr else process.stdout.strip()
             }
             
-        # Başarılı çıktıyı ham metin olarak döndürüyoruz
+        # Başarılı çıktıyı döndürüyoruz
         return {
             "sorgu": q,
             "ham_cikti": process.stdout.strip()
@@ -41,6 +47,5 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
         return {"hata": str(e)}
 
 if __name__ == "__main__":
-    # Render'ın dinamik port atamasını yakalar, parantezi eksiksiz kapatır
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
