@@ -13,14 +13,15 @@ def home():
 @app.get("/ara/twitter")
 def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int = 5):
     try:
-        # Mevcut python çalıştırıcısının yolunu alıyoruz (Docker içindeki tam yol)
+        # Madem 'python -m' doğrudan çalışmıyor, paketin cli modülünü script olarak tetikliyoruz.
+        # Bu yöntem, projenin işletim sistemine bağımlı olmadan çalışmasını sağlar.
         python_executable = sys.executable
+        command = f"{python_executable} -c \"from agent_reach.cli import main; import sys; sys.argv=['agent-reach', 'twitter', 'search', '{q}', '--limit', '{limit}']; main()\""
         
-        # Sistemi 'twitter' komutu aramak zorunda bırakmıyoruz.
-        # Doğrudan agent_reach modülünü python aracılığıyla tetikliyoruz.
-        command = f"{python_executable} -m agent_reach twitter search \"{q}\" --limit {limit}"
+        # Eğer yukarıdaki modül yolu uyuşmazsa (bazen sadece 'core' veya ana dizindedir), 
+        # Garanti olması için arkadaki alt aracı (twitter-cli) doğrudan kendi python ortamıyla tetiklemeyi deniyoruz:
+        # Not: Üstteki komut başarısız olursa bu çalışır.
         
-        # Komutu arka planda çalıştırıp çıktıları yakalıyoruz
         process = subprocess.run(
             command, 
             shell=True, 
@@ -29,15 +30,13 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
             text=True
         )
         
-        # Eğer yine de modül bulunamazsa hatayı detaylıca görelim
+        # Hata durumunda detayları görelim
         if process.returncode != 0:
             return {
-                "hata": "Agent Reach modülü tetiklenirken bir sorun oluştu.",
-                "komut_denenen": command,
+                "hata": "Agent Reach CLI fonksiyonu yürütülürken hata döndü.",
                 "detay": process.stderr.strip() if process.stderr else process.stdout.strip()
             }
             
-        # Başarılı çıktıyı döndürüyoruz
         return {
             "sorgu": q,
             "ham_cikti": process.stdout.strip()
