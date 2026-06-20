@@ -2,17 +2,17 @@ from flask import Flask, request, jsonify
 import subprocess
 import os
 import requests
-import re
 import json
+import re
 from urllib.parse import urlparse
 
 app = Flask(__name__)
 
-# Telegram Bot Token
+# Telegram Bot Token (Render Environment Variables'dan al)
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# Twitter Cookie'ler
+# Twitter Cookie'ler (Render Environment Variables'dan al)
 TWITTER_AUTH_TOKEN = os.environ.get('TWITTER_AUTH_TOKEN', '')
 TWITTER_CT0 = os.environ.get('TWITTER_CT0', '')
 
@@ -21,9 +21,9 @@ def home():
     return jsonify({
         "status": "Telegram Twitter + CSS Bot Çalışıyor!",
         "endpoints": {
-            "/webhook": "Telegram webhook",
-            "/search": "Twitter arama (test için)",
-            "/css": "CSS veri toplama (test için)"
+            "/webhook": "Telegram webhook (POST)",
+            "/search": "Twitter arama test (GET)",
+            "/css": "CSS analiz test (GET)"
         }
     })
 
@@ -44,9 +44,9 @@ def webhook():
 🤖 **Twitter + CSS Arama Botu'na Hoş Geldin!**
 
 📌 **Komutlar:**
-/search [kelime] [sayı] → Tweet ara
-/css [url] → Web sitesinin CSS bilgilerini topla
-/trend → Trend konular
+/search [kelime] [sayı] → Tweet ara (örn: /search bitcoin 5)
+/css [url] → Web sitesinin CSS bilgilerini topla (örn: /css https://example.com)
+/trend → Trend konuları göster
 /help → Yardım menüsü
                 """)
                 return jsonify({"status": "ok"})
@@ -98,8 +98,9 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
 def twitter_search(query, limit):
-    """Twitter araması yapar"""
+    """Twitter araması yapar ve sonucu formatlar"""
     try:
+        # Cookie'leri ortam değişkenlerine ayarla
         os.environ['TWITTER_AUTH_TOKEN'] = TWITTER_AUTH_TOKEN
         os.environ['TWITTER_CT0'] = TWITTER_CT0
         
@@ -116,14 +117,15 @@ def twitter_search(query, limit):
                 formatted += f"{i}. {tweet_text}\n"
             return formatted
         else:
-            return f"❌ '{query}' için sonuç bulunamadı."
+            return f"❌ '{query}' için sonuç bulunamadı. (Hata: {result.stderr})"
+    except subprocess.TimeoutExpired:
+        return "❌ Zaman aşımı: Twitter çok yavaş yanıt verdi."
     except Exception as e:
         return f"❌ Hata: {str(e)}"
 
 def css_analyzer(url):
     """Web sitesinden CSS verilerini toplar ve analiz eder"""
     try:
-        # URL'ye istek at
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         response = requests.get(url, headers=headers, timeout=15)
         html = response.text
@@ -132,73 +134,53 @@ def css_analyzer(url):
         css_links = re.findall(r'href=[\'"]?([^\'" >]+\.css[^\'" >]*)', html)
         inline_css = re.findall(r'<style[^>]*>(.*?)</style>', html, re.DOTALL)
         
-        # Sonuçları hazırla
         result = f"🎨 **CSS Analiz Sonuçları:**\n\n"
         result += f"📄 **Sayfa:** {url}\n"
         result += f"📦 **CSS Dosyaları:** {len(css_links)} adet\n"
         result += f"📝 **Inline CSS:** {'Var' if inline_css else 'Yok'}\n\n"
         
-        # CSS dosyalarını listele
         if css_links:
-            result += "📁 **CSS Dosyaları:**\n"
+            result += "📁 **CSS Dosyaları (ilk 5):**\n"
             for i, link in enumerate(css_links[:5], 1):
                 result += f"{i}. {link[:80]}\n"
         
-        # İlk inline CSS'ten örnek
         if inline_css:
             result += f"\n📝 **Inline CSS Örneği:**\n"
             sample = inline_css[0][:150].replace('\n', ' ').strip()
             result += f"```css\n{sample}...\n```\n"
         
-        # Kullanılan CSS framework'lerini tespit et
         frameworks = detect_frameworks(html)
         if frameworks:
             result += f"\n🧩 **Tespit Edilen Framework'ler:**\n"
             for fw in frameworks:
                 result += f"• {fw}\n"
         
-        # Renk paletini çıkar
         colors = extract_colors(html)
         if colors:
-            result += f"\n🎨 **Renk Paleti:**\n"
+            result += f"\n🎨 **Renk Paleti (ilk 10):**\n"
             for color in colors[:10]:
                 result += f"• {color}\n"
         
         return result
-        
     except Exception as e:
         return f"❌ CSS analiz hatası: {str(e)}"
 
 def detect_frameworks(html):
-    """Kullanılan CSS framework'lerini tespit eder"""
     frameworks = []
-    
-    if 'bootstrap' in html.lower():
-        frameworks.append('Bootstrap')
-    if 'tailwind' in html.lower():
-        frameworks.append('Tailwind CSS')
-    if 'foundation' in html.lower():
-        frameworks.append('Foundation')
-    if 'bulma' in html.lower():
-        frameworks.append('Bulma')
-    if 'materialize' in html.lower():
-        frameworks.append('Materialize')
-    if 'semantic-ui' in html.lower() or 'semantic ui' in html.lower():
-        frameworks.append('Semantic UI')
-    if 'uikit' in html.lower():
-        frameworks.append('UIkit')
-    
-    return frameworks if frameworks else ["Bilinmiyor"]
+    html_lower = html.lower()
+    if 'bootstrap' in html_lower: frameworks.append('Bootstrap')
+    if 'tailwind' in html_lower: frameworks.append('Tailwind CSS')
+    if 'foundation' in html_lower: frameworks.append('Foundation')
+    if 'bulma' in html_lower: frameworks.append('Bulma')
+    if 'materialize' in html_lower: frameworks.append('Materialize')
+    if 'semantic-ui' in html_lower or 'semantic ui' in html_lower: frameworks.append('Semantic UI')
+    if 'uikit' in html_lower: frameworks.append('UIkit')
+    return frameworks if frameworks else ["Bilinmiyor/tespit edilemedi"]
 
 def extract_colors(html):
-    """HTML'den CSS renk kodlarını çıkarır"""
     color_pattern = r'#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}|rgb\([^)]+\)|hsl\([^)]+\)'
     colors = re.findall(color_pattern, html)
-    
-    # Benzersiz renkler
     unique_colors = list(set(colors))
-    
-    # Çok fazla varsa sınırla
     return unique_colors[:15]
 
 def send_message(chat_id, text):
