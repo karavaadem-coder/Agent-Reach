@@ -12,8 +12,6 @@ COPY . .
 
 RUN pip install .
 
-RUN bash -c "yes | agent-reach install --env=auto --safe || true"
-
 EXPOSE 10000
 
 CMD ["python", "main.py"]
