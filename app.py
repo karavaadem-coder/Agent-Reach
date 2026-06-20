@@ -10,9 +10,9 @@ app = Flask(__name__)
 TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '')
 TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# Twitter Cookie'ler (Render Environment Variables'dan al)
-TWITTER_AUTH_TOKEN = os.environ.get('TWITTER_AUTH_TOKEN', '')
-TWITTER_CT0 = os.environ.get('TWITTER_CT0', '')
+# Twitter Cookie'ler DOĞRUDAN KODDA
+TWITTER_AUTH_TOKEN = '6d7a1f6910d3f239db29f22002a5f69f72acb820'
+TWITTER_CT0 = 'bce4c67ad81bdbdf908ec9a8e0c2465b01401015d1d0ee1c21c9ce5a102e02153db836d68a98bda1cd1d513d03af39efcc4a650875706f9b888d51af5be42cfb8569590513a9970ba1616113ee8974d9'
 
 @app.route('/')
 def home():
@@ -28,11 +28,9 @@ def home():
 @app.route('/webhook', methods=['POST', 'GET'])
 def webhook():
     """Telegram'dan gelen mesajları işler"""
-    # GET isteği için basit cevap (test amaçlı)
     if request.method == 'GET':
         return jsonify({"status": "Webhook adresi çalışıyor. POST isteği bekleniyor."})
     
-    # POST isteği için Telegram mesajlarını işle
     try:
         data = request.get_json()
         print(f"📩 Gelen mesaj: {data}")
@@ -41,7 +39,6 @@ def webhook():
             chat_id = data['message']['chat']['id']
             text = data['message'].get('text', '')
             
-            # /start komutu
             if text == '/start':
                 send_message(chat_id, """
 🤖 **Twitter + CSS Arama Botu'na Hoş Geldin!**
@@ -54,7 +51,6 @@ def webhook():
                 """)
                 return jsonify({"status": "ok"})
             
-            # /search komutu
             if text.startswith('/search'):
                 parts = text.split(' ')
                 if len(parts) >= 2:
@@ -69,7 +65,6 @@ def webhook():
                 else:
                     send_message(chat_id, "❌ Kullanım: `/search kelime sayı`")
             
-            # /css komutu
             elif text.startswith('/css'):
                 parts = text.split(' ')
                 if len(parts) >= 2:
@@ -80,13 +75,11 @@ def webhook():
                 else:
                     send_message(chat_id, "❌ Kullanım: `/css https://ornek.com`")
             
-            # /trend komutu
             elif text == '/trend':
                 send_message(chat_id, "📈 Trend konular aranıyor... ⏳")
                 result = twitter_search('trending', 10)
                 send_message(chat_id, f"📈 **Trend Konular:**\n{result}")
             
-            # /help komutu
             elif text == '/help':
                 send_message(chat_id, """
 📖 **Komutlar:**
@@ -106,10 +99,9 @@ def webhook():
 def twitter_search(query, limit):
     """Twitter araması yapar ve sonucu formatlar"""
     try:
-        # limit'i integer'a çevir (güvenlik için)
         limit = int(limit)
         
-        # Cookie'leri ortam değişkenlerine ayarla
+        # Cookie'leri doğrudan ortama yaz
         os.environ['TWITTER_AUTH_TOKEN'] = TWITTER_AUTH_TOKEN
         os.environ['TWITTER_CT0'] = TWITTER_CT0
         
@@ -127,9 +119,7 @@ def twitter_search(query, limit):
                 formatted += f"{i}. {tweet_text}\n"
             return formatted
         else:
-            return f"❌ '{query}' için sonuç bulunamadı. (Hata: {result.stderr})"
-    except ValueError:
-        return "❌ Hata: limit değeri bir sayı olmalı. Örnek: /search bitcoin 5"
+            return f"❌ '{query}' için sonuç bulunamadı."
     except subprocess.TimeoutExpired:
         return "❌ Zaman aşımı: Twitter çok yavaş yanıt verdi."
     except Exception as e:
@@ -142,7 +132,6 @@ def css_analyzer(url):
         response = requests.get(url, headers=headers, timeout=15)
         html = response.text
         
-        # CSS dosyalarını bul
         css_links = re.findall(r'href=[\'"]?([^\'" >]+\.css[^\'" >]*)', html)
         inline_css = re.findall(r'<style[^>]*>(.*?)</style>', html, re.DOTALL)
         
