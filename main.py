@@ -1,33 +1,47 @@
-from fastapi import FastAPI
-from agent_reach import AgentReach
-import uvicorn
+from fastapi import FastAPI, Query
+import subprocess
+import json
 import os
+import uvicorn
 
 app = FastAPI()
 
-# Projenin kendi içindeki agent_reach modülünü tetikliyoruz
-try:
-    reach = AgentReach()
-except Exception as e:
-    print(f"Agent Reach başlatılamadı: {e}")
-    reach = None
-
 @app.get("/")
 def home():
-    return {"durum": "Agent Reach aktif ve çalışıyor!"}
+    return {"durum": "Agent Reach CLI Köprüsü Aktif!"}
 
 @app.get("/ara/twitter")
-def twitter_ara(q: str, limit: int = 5):
-    if not reach:
-        return {"hata": "Agent Reach altyapısı yüklenemedi."}
+def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int = 5):
     try:
-        tweets = reach.twitter.search(query=q, limit=limit)
-        sonuclar = [{"yazar": t.author, "metin": t.text} for t in tweets]
-        return {"data": sonuclar}
+        # Agent Reach'in yeni yapısında komutlar doğrudan terminalden çağrılıyor.
+        # twitter-cli aracını q parametresiyle tetikliyoruz.
+        command = f"twitter search \"{q}\" --limit {limit}"
+        
+        # Komutu arka planda çalıştırıp çıktıyı yakalıyoruz
+        process = subprocess.run(
+            command, 
+            shell=True, 
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE, 
+            text=True
+        )
+        
+        if process.returncode != 0:
+            return {
+                "hata": "Komut çalıştırılırken bir sorun oluştu.",
+                "detay": process.stderr.strip()
+            }
+            
+        # Çıktıyı ekrana basıyoruz
+        return {
+            "sorgu": q,
+            "ham_cikti": process.stdout.strip()
+        }
+        
     except Exception as e:
         return {"hata": str(e)}
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=
-                port)
+    uvicorn.run(app, host="0.0.0.0", port=p
+                ort)
