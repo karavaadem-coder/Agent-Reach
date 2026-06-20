@@ -1,4 +1,4 @@
-# app.py - Bu dosyayı oluştur ve GitHub'a yükle
+# app.py - Agent Reach API
 import subprocess
 import json
 from flask import Flask, request, jsonify
@@ -11,7 +11,7 @@ def home():
     return jsonify({
         "status": "Agent Reach API Çalışıyor",
         "endpoints": {
-            "/twitter/search?q=bitcoin&limit=5": "Twitter arama",
+            "/twitter/search": "Twitter arama (q=bitcoin&limit=5)",
             "/agent-reach/doctor": "Sistem durumu"
         }
     })
@@ -22,7 +22,7 @@ def twitter_search():
     limit = request.args.get('limit', 5)
     
     try:
-        # Agent Reach'in twitter komutunu çalıştır
+        # twitter-cli ile arama yap
         cmd = ['twitter', 'search', query, '--limit', str(limit)]
         result = subprocess.run(
             cmd,
@@ -34,11 +34,13 @@ def twitter_search():
         return jsonify({
             "success": True,
             "command": " ".join(cmd),
-            "output": result.stdout,
+            "output": result.stdout if result.stdout else "Sonuç bulunamadı",
             "error": result.stderr if result.stderr else None
         })
     except subprocess.TimeoutExpired:
-        return jsonify({"error": "Zaman aşımı"}), 408
+        return jsonify({"error": "Zaman aşımı (30 saniye)"}), 408
+    except FileNotFoundError:
+        return jsonify({"error": "twitter komutu bulunamadı. Agent Reach kurulu mu?"}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -48,7 +50,8 @@ def doctor():
         result = subprocess.run(
             ['agent-reach', 'doctor'],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=30
         )
         return jsonify({
             "status": "ok",
