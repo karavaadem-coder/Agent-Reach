@@ -3,7 +3,6 @@ import subprocess
 import os
 import requests
 import re
-import json
 
 app = Flask(__name__)
 
@@ -98,60 +97,29 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
 def twitter_search(query, limit):
-    """Twitter araması yapar ve sonucu DETAYLI formatlar"""
+    """Twitter araması yapar - DÜZ METİN ÇIKTI"""
     try:
         limit = int(limit)
         os.environ['TWITTER_AUTH_TOKEN'] = TWITTER_AUTH_TOKEN
         os.environ['TWITTER_CT0'] = TWITTER_CT0
         
-        cmd = ['twitter', 'search', query, '-n', str(limit), '--format', 'json']
+        # --format OLMADAN sadece -n kullan
+        cmd = ['twitter', 'search', query, '-n', str(limit)]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
         if result.stdout:
-            try:
-                data = json.loads(result.stdout)
-                
-                # data'nın yapısını kontrol et
-                tweets = data.get('data', []) if isinstance(data, dict) else data
-                
-                if not tweets:
-                    return f"❌ '{query}' için sonuç bulunamadı."
-                
-                formatted = f"🔍 **'{query}' için {len(tweets)} tweet:**\n\n"
-                
-                for i, tweet in enumerate(tweets[:limit], 1):
-                    # Kullanıcı bilgileri
-                    author = tweet.get('author', {})
-                    username = author.get('screenName', 'bilinmiyor')
-                    name = author.get('name', 'bilinmiyor')
-                    text = tweet.get('text', '')[:300]
-                    likes = tweet.get('metrics', {}).get('likes', 0)
-                    retweets = tweet.get('metrics', {}).get('retweets', 0)
-                    replies = tweet.get('metrics', {}).get('replies', 0)
-                    created_at = tweet.get('createdAtLocal', tweet.get('createdAt', 'tarih yok'))
-                    
-                    formatted += f"{i}. **@{username}** ({name})\n"
-                    formatted += f"   📝 {text}\n"
-                    formatted += f"   ❤️ {likes}  🔄 {retweets}  💬 {replies}\n"
-                    formatted += f"   📍 {created_at}\n"
-                    
-                    # Varsa medya (resim) linki
-                    media = tweet.get('media', [])
-                    if media and len(media) > 0:
-                        formatted += f"   🖼️ {media[0].get('url', '')}\n"
-                    
-                    # Varsa tweet linki
-                    tweet_id = tweet.get('id', '')
-                    if tweet_id and username:
-                        formatted += f"   🔗 https://twitter.com/{username}/status/{tweet_id}\n"
-                    
-                    formatted += "\n"
-                
-                return formatted
-                
-            except json.JSONDecodeError:
-                # JSON değilse düz metin olarak göster
-                return f"🔍 **'{query}' için sonuç:**\n\n{result.stdout[:1500]}"
+            lines = result.stdout.strip().split('\n')
+            if not lines:
+                return f"❌ '{query}' için sonuç bulunamadı."
+            
+            formatted = f"🔍 **'{query}' için {len(lines)} tweet:**\n\n"
+            for i, line in enumerate(lines, 1):
+                clean_line = line.strip()
+                if clean_line:
+                    if len(clean_line) > 300:
+                        clean_line = clean_line[:300] + "..."
+                    formatted += f"{i}. {clean_line}\n\n"
+            return formatted
         else:
             return f"❌ '{query}' için sonuç bulunamadı.\nHata: {result.stderr[:200]}"
             
