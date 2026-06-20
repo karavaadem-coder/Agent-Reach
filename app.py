@@ -59,7 +59,10 @@ def webhook():
                 parts = text.split(' ')
                 if len(parts) >= 2:
                     query = parts[1]
-                    limit = parts[2] if len(parts) >= 3 else 5
+                    try:
+                        limit = int(parts[2]) if len(parts) >= 3 else 5
+                    except ValueError:
+                        limit = 5
                     send_message(chat_id, f"🔍 `{query}` aranıyor... ⏳")
                     result = twitter_search(query, limit)
                     send_message(chat_id, result)
@@ -103,6 +106,9 @@ def webhook():
 def twitter_search(query, limit):
     """Twitter araması yapar ve sonucu formatlar"""
     try:
+        # limit'i integer'a çevir (güvenlik için)
+        limit = int(limit)
+        
         # Cookie'leri ortam değişkenlerine ayarla
         os.environ['TWITTER_AUTH_TOKEN'] = TWITTER_AUTH_TOKEN
         os.environ['TWITTER_CT0'] = TWITTER_CT0
@@ -114,6 +120,7 @@ def twitter_search(query, limit):
             tweets = [t for t in result.stdout.strip().split('\n') if t.strip()]
             if not tweets:
                 return f"❌ '{query}' için sonuç bulunamadı."
+            
             formatted = f"🔍 **'{query}' için {len(tweets[:limit])} tweet:**\n\n"
             for i, tweet in enumerate(tweets[:limit], 1):
                 tweet_text = tweet[:200] + "..." if len(tweet) > 200 else tweet
@@ -121,6 +128,8 @@ def twitter_search(query, limit):
             return formatted
         else:
             return f"❌ '{query}' için sonuç bulunamadı. (Hata: {result.stderr})"
+    except ValueError:
+        return "❌ Hata: limit değeri bir sayı olmalı. Örnek: /search bitcoin 5"
     except subprocess.TimeoutExpired:
         return "❌ Zaman aşımı: Twitter çok yavaş yanıt verdi."
     except Exception as e:
@@ -203,7 +212,10 @@ def send_message(chat_id, text):
 @app.route('/search', methods=['GET'])
 def test_search():
     query = request.args.get('q', 'bitcoin')
-    limit = int(request.args.get('limit', 5))
+    try:
+        limit = int(request.args.get('limit', 5))
+    except ValueError:
+        limit = 5
     result = twitter_search(query, limit)
     return jsonify({"query": query, "limit": limit, "result": result})
 
