@@ -1,7 +1,5 @@
-# app.py - Agent Reach API
-import subprocess
-import json
 from flask import Flask, request, jsonify
+import subprocess
 import os
 
 app = Flask(__name__)
@@ -11,54 +9,30 @@ def home():
     return jsonify({
         "status": "Agent Reach API Çalışıyor",
         "endpoints": {
-            "/twitter/search": "Twitter arama (q=bitcoin&limit=5)",
-            "/agent-reach/doctor": "Sistem durumu"
+            "/twitter/search": "Twitter arama (kullanım: ?q=bitcoin&limit=5)"
         }
     })
 
-@app.route('/twitter/search')
+@app.route('/twitter/search', methods=['GET'])
 def twitter_search():
     query = request.args.get('q', 'bitcoin')
     limit = request.args.get('limit', 5)
     
     try:
-        # twitter-cli ile arama yap
         cmd = ['twitter', 'search', query, '--limit', str(limit)]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True)
         
         return jsonify({
             "success": True,
-            "command": " ".join(cmd),
-            "output": result.stdout if result.stdout else "Sonuç bulunamadı",
-            "error": result.stderr if result.stderr else None
-        })
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Zaman aşımı (30 saniye)"}), 408
-    except FileNotFoundError:
-        return jsonify({"error": "twitter komutu bulunamadı. Agent Reach kurulu mu?"}), 500
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/agent-reach/doctor')
-def doctor():
-    try:
-        result = subprocess.run(
-            ['agent-reach', 'doctor'],
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
-        return jsonify({
-            "status": "ok",
+            "query": query,
+            "limit": limit,
             "output": result.stdout
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
