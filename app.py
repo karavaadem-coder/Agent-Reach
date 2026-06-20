@@ -3,7 +3,6 @@ import subprocess
 import os
 import requests
 import re
-import json
 
 app = Flask(__name__)
 
@@ -104,37 +103,26 @@ def twitter_search(query, limit):
         os.environ['TWITTER_AUTH_TOKEN'] = TWITTER_AUTH_TOKEN
         os.environ['TWITTER_CT0'] = TWITTER_CT0
         
-        cmd = ['twitter', 'search', query, '-n', str(limit), '--format', 'json']
+        # --format kaldırıldı, sadece -n kullanıldı
+        cmd = ['twitter', 'search', query, '-n', str(limit)]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         
         if result.stdout:
-            try:
-                tweets = json.loads(result.stdout)
-                if not tweets:
-                    return f"❌ '{query}' için sonuç bulunamadı."
-                
-                formatted = f"🔍 **'{query}' için {len(tweets[:limit])} tweet:**\n\n"
-                for i, tweet in enumerate(tweets[:limit], 1):
-                    # Kullanıcı bilgileri
-                    username = tweet.get('user', {}).get('screen_name', 'bilinmiyor')
-                    name = tweet.get('user', {}).get('name', 'bilinmiyor')
-                    text = tweet.get('text', '')[:300]
-                    created_at = tweet.get('created_at', 'tarih yok')
-                    
-                    # Tweet linki
-                    tweet_id = tweet.get('id_str', '')
-                    tweet_url = f"https://twitter.com/{username}/status/{tweet_id}" if username and tweet_id else ""
-                    
-                    formatted += f"{i}. **@{username}** ({name})\n"
-                    formatted += f"   📝 {text}\n"
-                    formatted += f"   📍 {created_at}\n"
-                    if tweet_url:
-                        formatted += f"   🔗 {tweet_url}\n"
-                    formatted += "\n"
-                return formatted
-            except json.JSONDecodeError:
-                # JSON değilse düz metin olarak göster
-                return f"🔍 **'{query}' için sonuç:**\n\n{result.stdout[:1500]}"
+            # Çıktıyı satır satır işle
+            lines = result.stdout.strip().split('\n')
+            if not lines:
+                return f"❌ '{query}' için sonuç bulunamadı."
+            
+            formatted = f"🔍 **'{query}' için {len(lines)} tweet:**\n\n"
+            for i, line in enumerate(lines, 1):
+                # Satırı temizle ve kısalt
+                clean_line = line.strip()
+                if clean_line:
+                    # 300 karakterle sınırla
+                    if len(clean_line) > 300:
+                        clean_line = clean_line[:300] + "..."
+                    formatted += f"{i}. {clean_line}\n\n"
+            return formatted
         else:
             return f"❌ '{query}' için sonuç bulunamadı.\nHata: {result.stderr[:200]}"
     except subprocess.TimeoutExpired:
