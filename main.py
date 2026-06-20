@@ -2,7 +2,7 @@ from fastapi import FastAPI, Query
 import subprocess
 import os
 import uvicorn
-import sys
+import shutil
 
 app = FastAPI()
 
@@ -13,15 +13,24 @@ def home():
 @app.get("/ara/twitter")
 def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int = 5):
     try:
-        # Madem 'python -m' doğrudan çalışmıyor, paketin cli modülünü script olarak tetikliyoruz.
-        # Bu yöntem, projenin işletim sistemine bağımlı olmadan çalışmasını sağlar.
-        python_executable = sys.executable
-        command = f"{python_executable} -c \"from agent_reach.cli import main; import sys; sys.argv=['agent-reach', 'twitter', 'search', '{q}', '--limit', '{limit}']; main()\""
+        # Docker (nikolaik/python-nodejs) ortamında global npm ve pipx araçları
+        # genellikle bu iki yoldan birine yüklenir. İkisini de kontrol edip tam yolu buluyoruz.
+        possible_paths = [
+            "/usr/local/bin/twitter",
+            "/root/.local/bin/twitter",
+            "twitter" # Eğer şansımıza PATH'e eklendiyse
+        ]
         
-        # Eğer yukarıdaki modül yolu uyuşmazsa (bazen sadece 'core' veya ana dizindedir), 
-        # Garanti olması için arkadaki alt aracı (twitter-cli) doğrudan kendi python ortamıyla tetiklemeyi deniyoruz:
-        # Not: Üstteki komut başarısız olursa bu çalışır.
+        twitter_bin = "twitter"
+        for path in possible_paths:
+            if os.path.exists(path) or shutil.which(path):
+                twitter_bin = path
+                break
+
+        # Komutu doğrudan asıl aracı hedef alarak oluşturuyoruz
+        command = f"{twitter_bin} search \"{q}\" --limit {limit}"
         
+        # Komutu arka planda çalıştırıp çıktıları yakalıyoruz
         process = subprocess.run(
             command, 
             shell=True, 
@@ -30,10 +39,11 @@ def twitter_ara(q: str = Query(..., description="Aranacak kelime"), limit: int =
             text=True
         )
         
-        # Hata durumunda detayları görelim
+        # Eğer komut yine de bulunamaz veya hata verirse detayı görelim
         if process.returncode != 0:
             return {
-                "hata": "Agent Reach CLI fonksiyonu yürütülürken hata döndü.",
+                "hata": "Arka plandaki Twitter CLI aracı yürütülürken hata döndü.",
+                "denenen_komut": command,
                 "detay": process.stderr.strip() if process.stderr else process.stdout.strip()
             }
             
